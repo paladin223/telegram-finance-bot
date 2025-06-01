@@ -1,0 +1,35 @@
+FROM python:3.11-slim
+
+# Устанавливаем переменные окружения
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
+
+# Устанавливаем системные зависимости
+RUN apt-get update && apt-get install -y \
+    postgresql-client \
+    gcc \
+    python3-dev \
+    libpq-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Устанавливаем рабочую директорию
+WORKDIR /app
+
+# Копируем файлы зависимостей
+COPY requirements.txt .
+
+# Устанавливаем Python зависимости
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Копируем только необходимые файлы для тестов
+COPY app/ ./app/
+COPY tests/ ./tests/
+
+# Проверяем что все модули доступны
+RUN python -c "import sqlalchemy; import psycopg2; import pytest; print('✅ Все зависимости установлены')"
+
+# Команда по умолчанию для запуска тестов
+CMD ["python", "-m", "pytest", "tests/", "-v"] 

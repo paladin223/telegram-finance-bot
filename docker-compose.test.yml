@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: test_finance_bot
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d test_finance_bot"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  test_app:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/test_finance_bot
+      PYTHONPATH: /app
+      PYTHONUNBUFFERED: 1
+    volumes:
+      - ./tests:/app/tests
+      - ./app:/app/app
+    command: >
+      sh -c "
+        echo 'Проверка подключения к PostgreSQL...' &&
+        python -c 'import psycopg2; conn = psycopg2.connect(\"postgresql://postgres:postgres@postgres:5432/test_finance_bot\"); print(\"✅ PostgreSQL подключение успешно!\"); conn.close()' &&
+        echo 'Запуск тестов...' &&
+        python -m pytest tests/ -v --tb=short --maxfail=5
+      "
+
+volumes:
+  postgres_test_data: 
